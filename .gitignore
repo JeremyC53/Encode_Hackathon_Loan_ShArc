@@ -2,6 +2,7 @@ __pycache__
 app
 data_sources/credentials.json
 venv/
+backend/.venv312/
 secrets/
 backend/app/__pycache__/main.cpython-310.pyc
 backend/app/__pycache__/routes.cpython-310.pyc
