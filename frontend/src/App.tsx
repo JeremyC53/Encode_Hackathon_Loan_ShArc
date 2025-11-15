@@ -1,35 +1,44 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+// App.tsx
+import { useState } from "react";
+import type { User, View } from "./types";
+import LoginScreen from "./components/LoginScreen";
+import MainLayout from "./components/MainLayout";
+import DashboardScreen from "./screens/DashboardScreen";
+import LoansScreen from "./screens/LoansScreen";
+import SettingsScreen from "./screens/SettingsScreen";
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [view, setView] = useState<View>("dashboard");
+
+  if (!user) {
+    return <LoginScreen onLogin={setUser} />;
+  }
+
+  let content;
+  switch (view) {
+    case "loans":
+      content = <LoansScreen />;
+      break;
+    case "settings":
+      content = <SettingsScreen />;
+      break;
+    case "dashboard":
+    default:
+      content = <DashboardScreen />;
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <MainLayout
+      user={user}
+      currentView={view}
+      onChangeView={setView}
+      onLogout={() => {
+        setUser(null);
+        setView("dashboard");
+      }}
+    >
+      {content}
+    </MainLayout>
+  );
 }
-
-export default App
