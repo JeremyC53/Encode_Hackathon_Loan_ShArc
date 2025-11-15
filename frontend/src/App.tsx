@@ -1,4 +1,3 @@
-// App.tsx
 import { useState } from "react";
 import type { User, View } from "./types";
 import LoginScreen from "./components/LoginScreen";
@@ -7,6 +6,7 @@ import DashboardScreen from "./screens/DashboardScreen";
 import LoansScreen from "./screens/LoansScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import EarningsScreen from "./screens/EarningsScreen"; // 👈 NEW
+import { WalletProvider } from "./contexts/WalletContext";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -33,16 +33,18 @@ export default function App() {
   }
 
   return (
-    <MainLayout
-      user={user}
-      currentView={view}
-      onChangeView={setView}
-      onLogout={() => {
-        setUser(null);
-        setView("dashboard");
-      }}
-    >
-      {content}
-    </MainLayout>
+    <WalletProvider>
+      <MainLayout
+        user={user}
+        currentView={view}
+        onChangeView={setView}
+        onLogout={() => {
+          setUser(null);
+          setView("dashboard");
+        }}
+      >
+        {content}
+      </MainLayout>
+    </WalletProvider>
   );
 }
