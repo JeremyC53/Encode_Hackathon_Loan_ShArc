@@ -1,0 +1,113 @@
+{
+  "freelancerAddress": "0x1234567890abcdef1234567890abcdef12345678",
+  "snapshotTimestamp": "2025-11-15T12:00:00Z",
+  "snapshotTimestampEpoch": 1763217600,
+  "lookbackMonths": 12,
+  "platforms": [
+    {
+      "platform": "upwork",
+      "currency": "USDC",
+      "sourceCsv": "../secrets/upwork_payouts.csv",
+      "transactions": [
+        {
+          "id": "up-87231",
+          "timestamp": "2025-08-03T15:42:11Z",
+          "grossAmount": "2600.50",
+          "netAmount": "2470.48",
+          "client": "Finova Labs",
+          "description": "Data pipeline maintenance sprint",
+          "status": "released"
+        },
+        {
+          "id": "up-89214",
+          "timestamp": "2025-09-27T10:04:44Z",
+          "grossAmount": "1800.00",
+          "netAmount": "1710.00",
+          "client": "Northwind LLC",
+          "description": "Product design retainer",
+          "status": "released"
+        }
+      ],
+      "summary": {
+        "totalEarnedUsdc": 12500000,
+        "csvSampleCount": 26,
+        "lastPayoutDate": "2025-11-13",
+        "lastPayoutEpoch": 1763011200,
+        "onTimeRatioBps": 9700
+      }
+    },
+    {
+      "platform": "fiverr",
+      "currency": "USDC",
+      "sourceCsv": "../secrets/fiverr_payouts.csv",
+      "transactions": [
+        {
+          "id": "fi-99812",
+          "timestamp": "2025-07-14T08:18:00Z",
+          "grossAmount": "420.00",
+          "netAmount": "386.40",
+          "client": "Glow Studio",
+          "description": "Logo + brand refresh",
+          "status": "released"
+        },
+        {
+          "id": "fi-100321",
+          "timestamp": "2025-10-01T19:02:55Z",
+          "grossAmount": "650.00",
+          "netAmount": "597.50",
+          "client": "Proto Commerce",
+          "description": "E-commerce landing page",
+          "status": "released"
+        }
+      ],
+      "summary": {
+        "totalEarnedUsdc": 6200000,
+        "csvSampleCount": 24,
+        "lastPayoutDate": "2025-11-10",
+        "lastPayoutEpoch": 1762752000,
+        "onTimeRatioBps": 9300
+      }
+    },
+    {
+      "platform": "uber",
+      "currency": "GBP",
+      "fxRateSource": "https://api.circle.com/v1/prices/EURCUSD",
+      "fxRateUsdPerGbp": "1.27",
+      "sourceCsv": "../secrets/uber_earnings.csv",
+      "transactions": [
+        {
+          "id": "ub-559912",
+          "timestamp": "2025-09-02T23:57:04Z",
+          "grossAmount": "210.75",
+          "netAmount": "205.12",
+          "city": "New York",
+          "status": "released"
+        },
+        {
+          "id": "ub-571443",
+          "timestamp": "2025-09-03T01:18:22Z",
+          "grossAmount": "89.90",
+          "netAmount": "87.20",
+          "city": "New York",
+          "status": "released"
+        }
+      ],
+      "summary": {
+        "totalEarnedUsdc": 9800000,
+        "csvSampleCount": 28,
+        "lastPayoutDate": "2025-11-14",
+        "lastPayoutEpoch": 1763097600,
+        "onTimeRatioBps": 9900
+      }
+    }
+  ],
+  "aggregateMetrics": {
+    "totalEarnedUsdc": 28500000,
+    "platformCount": 3,
+    "averageMonthlyIncomeUsdc": 2375000,
+    "weightedOnTimeRatioBps": 9635,
+    "totalCsvSampleCount": 78,
+    "sourceScript": "https://github.com/JeremyC53/Encode_Hackathon_Loan_ShArc/blob/main/data_sources/google_mail.py"
+  }
+}
+
