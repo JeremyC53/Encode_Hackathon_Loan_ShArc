@@ -22,7 +22,7 @@ class Transaction(Base):
     id = Column(Integer, primary_key=True, index=True)
     
     # User identification
-    user_address = Column(String(42), nullable=False, index=True)  # Ethereum address (0x...)
+    user_address = Column(String(66), nullable=False, index=True)  # Ethereum address (0x...) - using 66 to match tx_hash length
     
     # Transaction details
     transaction_type = Column(String(20), nullable=False, index=True)  # 'borrow', 'repay', 'loan_issued', etc.
@@ -66,7 +66,7 @@ class LoanHistory(Base):
     
     # Loan identification
     loan_id = Column(Integer, unique=True, nullable=False, index=True)  # On-chain loan ID
-    user_address = Column(String(42), nullable=False, index=True)
+    user_address = Column(String(66), nullable=False, index=True)
     
     # Loan terms
     principal = Column(Numeric(20, 6), nullable=False)  # Original loan amount
@@ -101,7 +101,7 @@ class CreditScoreHistory(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     
-    user_address = Column(String(42), nullable=False, index=True)
+    user_address = Column(String(66), nullable=False, index=True)
     credit_score = Column(Integer, nullable=False)
     
     # Source of the score

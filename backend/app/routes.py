@@ -102,41 +102,72 @@ def create_transaction(
     """
     try:
         # Parse transaction timestamp
-        tx_timestamp = datetime.fromisoformat(transaction.transaction_timestamp.replace("Z", "+00:00"))
-    except ValueError:
-        tx_timestamp = datetime.utcnow()
+        try:
+            # Try to parse ISO format timestamp
+            if transaction.transaction_timestamp:
+                tx_timestamp = datetime.fromisoformat(
+                    transaction.transaction_timestamp.replace("Z", "+00:00")
+                )
+            else:
+                tx_timestamp = datetime.utcnow()
+        except (ValueError, AttributeError) as e:
+            # Fall back to current time if parsing fails
+            tx_timestamp = datetime.utcnow()
 
-    db_transaction = Transaction(
-        user_address=transaction.user_address.lower(),  # Normalize to lowercase
-        transaction_type=transaction.transaction_type,
-        amount=transaction.amount,
-        currency=transaction.currency,
-        loan_id=transaction.loan_id,
-        tx_hash=transaction.tx_hash,
-        block_number=transaction.block_number,
-        transaction_timestamp=tx_timestamp,
-        status=transaction.status,
-        extra_metadata=transaction.extra_metadata,
-    )
+        # Validate user address format
+        user_address = transaction.user_address.strip().lower()
+        if not user_address.startswith("0x") or len(user_address) < 10:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid user address format: {transaction.user_address}"
+            )
 
-    db.add(db_transaction)
-    db.commit()
-    db.refresh(db_transaction)
+        # Create transaction record
+        db_transaction = Transaction(
+            user_address=user_address,
+            transaction_type=transaction.transaction_type,
+            amount=transaction.amount,
+            currency=transaction.currency or "USDC",
+            loan_id=transaction.loan_id,
+            tx_hash=transaction.tx_hash,
+            block_number=transaction.block_number,
+            transaction_timestamp=tx_timestamp,
+            status=transaction.status or "pending",
+            extra_metadata=transaction.extra_metadata,
+        )
 
-    return TransactionResponse(
-        id=db_transaction.id,
-        user_address=db_transaction.user_address,
-        transaction_type=db_transaction.transaction_type,
-        amount=float(db_transaction.amount),
-        currency=db_transaction.currency,
-        loan_id=db_transaction.loan_id,
-        tx_hash=db_transaction.tx_hash,
-        block_number=db_transaction.block_number,
-        created_at=db_transaction.created_at.isoformat(),
-        transaction_timestamp=db_transaction.transaction_timestamp.isoformat(),
-        status=db_transaction.status,
-        extra_metadata=db_transaction.extra_metadata,
-    )
+        db.add(db_transaction)
+        db.commit()
+        db.refresh(db_transaction)
+
+        return TransactionResponse(
+            id=db_transaction.id,
+            user_address=db_transaction.user_address,
+            transaction_type=db_transaction.transaction_type,
+            amount=float(db_transaction.amount),
+            currency=db_transaction.currency,
+            loan_id=db_transaction.loan_id,
+            tx_hash=db_transaction.tx_hash,
+            block_number=db_transaction.block_number,
+            created_at=db_transaction.created_at.isoformat(),
+            transaction_timestamp=db_transaction.transaction_timestamp.isoformat(),
+            status=db_transaction.status,
+            extra_metadata=db_transaction.extra_metadata,
+        )
+    
+    except HTTPException:
+        # Re-raise HTTP exceptions (like validation errors)
+        raise
+    except Exception as e:
+        # Log the error and return a 500 with details
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error creating transaction: {error_details}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create transaction: {str(e)}"
+        )
 
 
 @router.get("/transactions", response_model=TransactionListResponse)

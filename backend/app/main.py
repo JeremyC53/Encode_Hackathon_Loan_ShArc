@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import sys
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from fastapi.responses import PlainTextResponse
 
 from .routes import router
 from .database import init_db
+from .blockchain_listener import listen_to_blockchain_events
 
 # Add parent directory to path to import data_sources
 parent_dir = Path(__file__).parent.parent.parent
@@ -46,8 +48,10 @@ def create_app() -> FastAPI:
 
     # ⭐ Initialize database on startup
     @app.on_event("startup")
-    def startup_event():
+    async def startup_event():
         init_db()
+        # Start blockchain event listener in background
+        asyncio.create_task(listen_to_blockchain_events())
 
     # ⭐ Include router from /routes
     app.include_router(router)
@@ -60,10 +64,14 @@ def create_app() -> FastAPI:
 
     @app.get("/uber-earnings", response_class=PlainTextResponse)
     def get_uber_earnings():
-        with open("secrets/uber_earnings.csv", "r") as f:
-            content = f.read()
-        print(">>> /uber-earnings hit")
-        return content
+        csv_path = Path(__file__).parent.parent.parent / "secrets" / "uber_earnings.csv"
+        if csv_path.exists():
+            with open(csv_path, "r") as f:
+                content = f.read()
+            print(">>> /uber-earnings hit")
+            return content
+        else:
+            return "No earnings data available. Connect your Google account in Settings."
 
     return app
 

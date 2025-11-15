@@ -5,6 +5,7 @@ import LoginScreen from "./components/LoginScreen";
 import MainLayout from "./components/MainLayout";
 import DashboardScreen from "./screens/DashboardScreen";
 import LoansScreen from "./screens/LoansScreen";
+import BorrowRepayScreen from "./screens/BorrowRepayScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 
 export default function App() {
@@ -19,6 +20,9 @@ export default function App() {
   switch (view) {
     case "loans":
       content = <LoansScreen />;
+      break;
+    case "borrow-repay":
+      content = <BorrowRepayScreen />;
       break;
     case "settings":
       content = <SettingsScreen />;

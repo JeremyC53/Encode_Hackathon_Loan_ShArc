@@ -76,7 +76,7 @@ class TransactionCreate(BaseModel):
     loan_id: Optional[int] = None
     tx_hash: Optional[str] = None
     block_number: Optional[int] = None
-    transaction_timestamp: str  # ISO format datetime
+    transaction_timestamp: Optional[str] = None  # ISO format datetime, defaults to now if not provided
     status: str = "pending"
     extra_metadata: Optional[str] = None
 
