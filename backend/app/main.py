@@ -1,11 +1,27 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
 from .routes import router
-from data_sources.google_mail import main as google_mail_main
+from .database import init_db
+
+# Add parent directory to path to import data_sources
+parent_dir = Path(__file__).parent.parent.parent
+if str(parent_dir) not in sys.path:
+    sys.path.insert(0, str(parent_dir))
+
+try:
+    from data_sources.google_mail import main as google_mail_main
+except ImportError:
+    # If data_sources is not available, create a dummy function
+    def google_mail_main():
+        print("Warning: data_sources.google_mail not available")
+        return None
 
 
 def create_app() -> FastAPI:
@@ -27,6 +43,11 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # ⭐ Initialize database on startup
+    @app.on_event("startup")
+    def startup_event():
+        init_db()
 
     # ⭐ Include router from /routes
     app.include_router(router)

@@ -1,11 +1,25 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import desc
 
-from .schemas import FreelanceHistoryPayload, FreelancePreviewResponse, HealthResponse
+from .database import get_db
+from .models import Transaction, LoanHistory
+from .schemas import (
+    FreelanceHistoryPayload,
+    FreelancePreviewResponse,
+    HealthResponse,
+    TransactionCreate,
+    TransactionResponse,
+    TransactionListResponse,
+    LoanHistoryResponse,
+)
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -74,3 +88,255 @@ def preview_freelance_history(payload: FreelanceHistoryPayload) -> FreelancePrev
     `FreelanceCreditScorer`.
     """
     return _summarize_history(payload)
+
+
+# Transaction endpoints
+@router.post("/transactions", response_model=TransactionResponse, status_code=201)
+def create_transaction(
+    transaction: TransactionCreate,
+    db: Session = Depends(get_db),
+) -> TransactionResponse:
+    """
+    Create a new transaction record.
+    Use this to log borrows, repayments, and other loan-related transactions.
+    """
+    try:
+        # Parse transaction timestamp
+        tx_timestamp = datetime.fromisoformat(transaction.transaction_timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        tx_timestamp = datetime.utcnow()
+
+    db_transaction = Transaction(
+        user_address=transaction.user_address.lower(),  # Normalize to lowercase
+        transaction_type=transaction.transaction_type,
+        amount=transaction.amount,
+        currency=transaction.currency,
+        loan_id=transaction.loan_id,
+        tx_hash=transaction.tx_hash,
+        block_number=transaction.block_number,
+        transaction_timestamp=tx_timestamp,
+        status=transaction.status,
+        extra_metadata=transaction.extra_metadata,
+    )
+
+    db.add(db_transaction)
+    db.commit()
+    db.refresh(db_transaction)
+
+    return TransactionResponse(
+        id=db_transaction.id,
+        user_address=db_transaction.user_address,
+        transaction_type=db_transaction.transaction_type,
+        amount=float(db_transaction.amount),
+        currency=db_transaction.currency,
+        loan_id=db_transaction.loan_id,
+        tx_hash=db_transaction.tx_hash,
+        block_number=db_transaction.block_number,
+        created_at=db_transaction.created_at.isoformat(),
+        transaction_timestamp=db_transaction.transaction_timestamp.isoformat(),
+        status=db_transaction.status,
+        extra_metadata=db_transaction.extra_metadata,
+    )
+
+
+@router.get("/transactions", response_model=TransactionListResponse)
+def get_transactions(
+    user_address: Optional[str] = Query(None, description="Filter by user address"),
+    transaction_type: Optional[str] = Query(None, description="Filter by transaction type"),
+    loan_id: Optional[int] = Query(None, description="Filter by loan ID"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(50, ge=1, le=100, description="Items per page"),
+    db: Session = Depends(get_db),
+) -> TransactionListResponse:
+    """
+    Get transaction history with optional filters.
+    Supports pagination and filtering by user, type, and loan ID.
+    """
+    query = db.query(Transaction)
+
+    # Apply filters
+    if user_address:
+        query = query.filter(Transaction.user_address == user_address.lower())
+    if transaction_type:
+        query = query.filter(Transaction.transaction_type == transaction_type)
+    if loan_id:
+        query = query.filter(Transaction.loan_id == loan_id)
+
+    # Get total count
+    total = query.count()
+
+    # Apply pagination and ordering
+    transactions = (
+        query.order_by(desc(Transaction.transaction_timestamp))
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    # Convert to response format
+    transaction_responses = [
+        TransactionResponse(
+            id=tx.id,
+            user_address=tx.user_address,
+            transaction_type=tx.transaction_type,
+            amount=float(tx.amount),
+            currency=tx.currency,
+            loan_id=tx.loan_id,
+            tx_hash=tx.tx_hash,
+            block_number=tx.block_number,
+            created_at=tx.created_at.isoformat(),
+            transaction_timestamp=tx.transaction_timestamp.isoformat(),
+            status=tx.status,
+            extra_metadata=tx.extra_metadata,
+        )
+        for tx in transactions
+    ]
+
+    return TransactionListResponse(
+        transactions=transaction_responses,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/transactions/{transaction_id}", response_model=TransactionResponse)
+def get_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+) -> TransactionResponse:
+    """Get a specific transaction by ID."""
+    transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    return TransactionResponse(
+        id=transaction.id,
+        user_address=transaction.user_address,
+        transaction_type=transaction.transaction_type,
+        amount=float(transaction.amount),
+        currency=transaction.currency,
+        loan_id=transaction.loan_id,
+        tx_hash=transaction.tx_hash,
+        block_number=transaction.block_number,
+        created_at=transaction.created_at.isoformat(),
+        transaction_timestamp=transaction.transaction_timestamp.isoformat(),
+        status=transaction.status,
+        extra_metadata=transaction.extra_metadata,
+    )
+
+
+@router.get("/users/{user_address}/transactions", response_model=TransactionListResponse)
+def get_user_transactions(
+    user_address: str,
+    transaction_type: Optional[str] = Query(None, description="Filter by transaction type"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> TransactionListResponse:
+    """
+    Get all transactions for a specific user.
+    Convenience endpoint that filters by user address.
+    """
+    return get_transactions(
+        user_address=user_address,
+        transaction_type=transaction_type,
+        page=page,
+        page_size=page_size,
+        db=db,
+    )
+
+
+@router.get("/loans/{loan_id}/transactions", response_model=TransactionListResponse)
+def get_loan_transactions(
+    loan_id: int,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> TransactionListResponse:
+    """
+    Get all transactions for a specific loan.
+    """
+    return get_transactions(
+        loan_id=loan_id,
+        page=page,
+        page_size=page_size,
+        db=db,
+    )
+
+
+# Loan history endpoints
+@router.get("/loans", response_model=list[LoanHistoryResponse])
+def get_loans(
+    user_address: Optional[str] = Query(None, description="Filter by user address"),
+    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    db: Session = Depends(get_db),
+) -> list[LoanHistoryResponse]:
+    """
+    Get loan history with optional filters.
+    """
+    query = db.query(LoanHistory)
+
+    if user_address:
+        query = query.filter(LoanHistory.user_address == user_address.lower())
+    if is_active is not None:
+        query = query.filter(LoanHistory.is_active == is_active)
+
+    loans = query.order_by(desc(LoanHistory.loan_timestamp)).all()
+
+    return [
+        LoanHistoryResponse(
+            id=loan.id,
+            loan_id=loan.loan_id,
+            user_address=loan.user_address,
+            principal=float(loan.principal),
+            service_fee=float(loan.service_fee),
+            total_owed=float(loan.total_owed),
+            amount_repaid=float(loan.amount_repaid),
+            is_active=loan.is_active,
+            created_at=loan.created_at.isoformat(),
+            loan_timestamp=loan.loan_timestamp.isoformat(),
+            last_updated=loan.last_updated.isoformat(),
+            tx_hash=loan.tx_hash,
+            credit_score_at_issuance=loan.credit_score_at_issuance,
+            apr_bps=loan.apr_bps,
+        )
+        for loan in loans
+    ]
+
+
+@router.get("/users/{user_address}/loans", response_model=list[LoanHistoryResponse])
+def get_user_loans(
+    user_address: str,
+    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    db: Session = Depends(get_db),
+) -> list[LoanHistoryResponse]:
+    """
+    Get all loans for a specific user.
+    """
+    query = db.query(LoanHistory).filter(LoanHistory.user_address == user_address.lower())
+    
+    if is_active is not None:
+        query = query.filter(LoanHistory.is_active == is_active)
+    
+    loans = query.order_by(desc(LoanHistory.loan_timestamp)).all()
+    
+    return [
+        LoanHistoryResponse(
+            id=loan.id,
+            loan_id=loan.loan_id,
+            user_address=loan.user_address,
+            principal=float(loan.principal),
+            service_fee=float(loan.service_fee),
+            total_owed=float(loan.total_owed),
+            amount_repaid=float(loan.amount_repaid),
+            is_active=loan.is_active,
+            created_at=loan.created_at.isoformat(),
+            loan_timestamp=loan.loan_timestamp.isoformat(),
+            last_updated=loan.last_updated.isoformat(),
+            tx_hash=loan.tx_hash,
+            credit_score_at_issuance=loan.credit_score_at_issuance,
+            apr_bps=loan.apr_bps,
+        )
+        for loan in loans
+    ]

@@ -65,3 +65,62 @@ class FreelancePreviewResponse(BaseModel):
     lookbackMonths: int
     snapshotTimestampEpoch: int
     message: str
+
+
+# Transaction schemas
+class TransactionCreate(BaseModel):
+    user_address: str
+    transaction_type: str  # 'borrow', 'repay', 'loan_issued', etc.
+    amount: float
+    currency: str = "USDC"
+    loan_id: Optional[int] = None
+    tx_hash: Optional[str] = None
+    block_number: Optional[int] = None
+    transaction_timestamp: str  # ISO format datetime
+    status: str = "pending"
+    extra_metadata: Optional[str] = None
+
+
+class TransactionResponse(BaseModel):
+    id: int
+    user_address: str
+    transaction_type: str
+    amount: float
+    currency: str
+    loan_id: Optional[int] = None
+    tx_hash: Optional[str] = None
+    block_number: Optional[int] = None
+    created_at: str
+    transaction_timestamp: str
+    status: str
+    extra_metadata: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class LoanHistoryResponse(BaseModel):
+    id: int
+    loan_id: int
+    user_address: str
+    principal: float
+    service_fee: float
+    total_owed: float
+    amount_repaid: float
+    is_active: bool
+    created_at: str
+    loan_timestamp: str
+    last_updated: str
+    tx_hash: Optional[str] = None
+    credit_score_at_issuance: Optional[int] = None
+    apr_bps: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TransactionListResponse(BaseModel):
+    transactions: List[TransactionResponse]
+    total: int
+    page: int
+    page_size: int
