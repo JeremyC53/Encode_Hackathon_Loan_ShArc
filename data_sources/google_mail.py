@@ -18,17 +18,17 @@ def get_service():
     """Authenticate and return a Gmail API service."""
     creds = None
     if os.path.exists(",,."):
-        creds = Credentials.from_authorized_user_file("../secrets/token.json", SCOPES)
+        creds = Credentials.from_authorized_user_file("secrets/token.json", SCOPES)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                "../secrets/credentials.json", SCOPES
+                "secrets/credentials.json", SCOPES
             )
             creds = flow.run_local_server(port=0)
-        with open("../secrets/token.json", "w") as token:
+        with open("secrets/token.json", "w") as token:
             token.write(creds.to_json())
 
     return build("gmail", "v1", credentials=creds)
@@ -38,8 +38,8 @@ def list_uber_emails(service):
     """
     List Uber weekly fare breakdown emails (most recent first).
     """
-    query = 'from:noreply@uber.com "your weekly fare breakdown"'
-    # query = 'from:seddiqazam@googlemail.com "your weekly fare breakdown"'
+    # query = 'from:noreply@uber.com "your weekly fare breakdown"'
+    query = 'from:seddiqazam@googlemail.com "your weekly fare breakdown"'
     results = service.users().messages().list(
         userId="me", q=query, maxResults=MAX_EMAILS
     ).execute()
@@ -145,7 +145,7 @@ def main():
     rows.sort(key=lambda r: r[0], reverse=True)
 
     # write CSV
-    csv_path = "../secrets/uber_earnings.csv"
+    csv_path = "secrets/uber_earnings.csv"
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["date", "earnings_gbp"])
