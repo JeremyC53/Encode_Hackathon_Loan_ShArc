@@ -22,6 +22,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const navItems: { id: View; label: string }[] = [
     { id: "dashboard", label: "Dashboard" },
     { id: "loans", label: "Loans" },
+    { id: "earnings", label: "Earnings"},
     { id: "settings", label: "Settings" },
   ];
 

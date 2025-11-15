@@ -5,7 +5,7 @@ import csv
 import json
 from datetime import datetime
 import io
-from supabase import create_client, Client  # pip install supabase
+from supabase import create_client, Client 
 
 
 from google.auth.transport.requests import Request
@@ -22,9 +22,14 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_KEY"]
 
 SUPABASE_BUCKET_NAME = "earnings"  # the bucket you created
 
+_supabase_client = None
 
 def get_supabase_client() -> Client:
-    return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    global _supabase_client
+    if _supabase_client is None:
+        _supabase_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    return _supabase_client
+
 
 
 def get_service():
@@ -62,8 +67,8 @@ def list_fiverr_emails(service):
     """
     List Uber weekly fare breakdown emails (most recent first).
     """
-    # query = 'from:noreply@e.fiverr.com "received an order from"'
-    query = 'from:wdeva22@gmail.com "received an order from"'
+    query = 'from:noreply@e.fiverr.com "received an order from"'
+    # query = 'from:wdeva22@gmail.com "received an order from"'
     results = service.users().messages().list(
         userId="me", q=query, maxResults=MAX_EMAILS
     ).execute()
@@ -73,8 +78,8 @@ def list_upwork_emails(service):
     """
     List Uber weekly fare breakdown emails (most recent first).
     """
-    # query = 'from:donotreply@upwork.com "Your payment has been processed"'
-    query = 'from:wdeva22@gmail.com "Your payment has been processed"'
+    query = 'from:donotreply@upwork.com "Your payment has been processed"'
+    # query = 'from:wdeva22@gmail.com "Your payment has been processed"'
     results = service.users().messages().list(
         userId="me", q=query, maxResults=MAX_EMAILS
     ).execute()
@@ -235,12 +240,9 @@ def extract_currency_amount(body_text, context_pattern=None):
     return amount_str, symbol, value
 
 def main():
+    print("service started")
     service = get_service()
     uber_messages = list_uber_emails(service)
-
-    if not uber_messages:
-        print("No Uber weekly fare breakdown emails found.")
-        return
 
     rows = []
 
@@ -266,10 +268,6 @@ def main():
 
     fiverr_messages = list_fiverr_emails(service)
 
-    if not fiverr_messages:
-        print("No Uber weekly fare breakdown emails found.")
-        return
-
     for msg in fiverr_messages:
         body, full_msg = get_email_body(service, msg)
 
@@ -291,10 +289,6 @@ def main():
         rows.append((dt, date_str, company, amount_str))
 
     upwork_messages = list_upwork_emails(service)
-
-    if not upwork_messages:
-        print("No Uber weekly fare breakdown emails found.")
-        return
 
     for msg in upwork_messages:
         body, full_msg = get_email_body(service, msg)

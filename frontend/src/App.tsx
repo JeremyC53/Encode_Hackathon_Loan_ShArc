@@ -6,6 +6,7 @@ import MainLayout from "./components/MainLayout";
 import DashboardScreen from "./screens/DashboardScreen";
 import LoansScreen from "./screens/LoansScreen";
 import SettingsScreen from "./screens/SettingsScreen";
+import EarningsScreen from "./screens/EarningsScreen"; // 👈 NEW
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -22,6 +23,9 @@ export default function App() {
       break;
     case "settings":
       content = <SettingsScreen />;
+      break;
+    case "earnings":
+      content = <EarningsScreen />;
       break;
     case "dashboard":
     default:

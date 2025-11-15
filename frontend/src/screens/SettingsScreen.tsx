@@ -78,7 +78,7 @@ const SettingsScreen: React.FC = () => {
       </div>
 
       {/* SHOW CSV OUTPUT */}
-      <pre
+      {/* <pre
         style={{
           whiteSpace: "pre-wrap",
           marginTop: 30,
@@ -89,7 +89,7 @@ const SettingsScreen: React.FC = () => {
         }}
       >
         {csvText}
-      </pre>
+      </pre> */}
     </div>
   );
 };
