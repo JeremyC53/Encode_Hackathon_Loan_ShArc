@@ -1,13 +1,1 @@
-fastapi
-uvicorn[standard]
-httpx
-python-dotenv
-pydantic
-google-auth
-google-auth-oauthlib
-google-api-python-client
-beautifulsoup4
-circle-user-controlled-wallets
-web3
-circleci
-bcrypt
+-r ../requirements.txt
