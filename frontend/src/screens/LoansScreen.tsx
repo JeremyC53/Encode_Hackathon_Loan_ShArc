@@ -6,7 +6,7 @@ const LoansScreen: React.FC = () => {
     <div>
       <h1 style={{ fontSize: 24, marginBottom: 8 }}>Loans</h1>
       <p style={{ color: "#9ca3af", marginBottom: 24 }}>
-        List of demo loans (static for now).
+        Loans history.
       </p>
 
       <table

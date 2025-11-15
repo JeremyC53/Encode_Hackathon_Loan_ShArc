@@ -3,4 +3,4 @@ export type User = {
   walletAddress?: string;
 };
 
-export type View = "dashboard" | "loans" | "settings";
+export type View = "dashboard" | "loans" | "settings" | "earnings";

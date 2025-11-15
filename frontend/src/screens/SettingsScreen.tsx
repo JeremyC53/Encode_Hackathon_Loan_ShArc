@@ -52,7 +52,7 @@ const SettingsScreen: React.FC = () => {
     <div>
       <h1 style={{ fontSize: 24, marginBottom: 8 }}>Settings</h1>
       <p style={{ color: "#9ca3af", marginBottom: 24 }}>
-        Connect your accounts to power the demo.
+        Connect your accounts for automated retrieval of your frelance earnings.
       </p>
 
       <div
@@ -78,7 +78,7 @@ const SettingsScreen: React.FC = () => {
       </div>
 
       {/* SHOW CSV OUTPUT */}
-      <pre
+      {/* <pre
         style={{
           whiteSpace: "pre-wrap",
           marginTop: 30,
@@ -89,7 +89,7 @@ const SettingsScreen: React.FC = () => {
         }}
       >
         {csvText}
-      </pre>
+      </pre> */}
     </div>
   );
 };

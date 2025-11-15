@@ -6,7 +6,7 @@ const DashboardScreen: React.FC = () => {
     <div>
       <h1 style={{ fontSize: 24, marginBottom: 8 }}>Dashboard</h1>
       <p style={{ color: "#9ca3af", marginBottom: 24 }}>
-        Quick overview of your hackathon bank app.
+        Quick overview of your personal finances.
       </p>
 
       <div
