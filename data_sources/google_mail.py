@@ -56,8 +56,8 @@ def list_uber_emails(service):
     """
     List Uber weekly fare breakdown emails (most recent first).
     """
-    # query = 'from:noreply@uber.com "your weekly fare breakdown"'
-    query = 'from:seddiqazam@googlemail.com "your weekly fare breakdown"'
+    query = 'from:noreply@uber.com "your weekly fare breakdown"'
+    # query = 'from:seddiqazam@googlemail.com "your weekly fare breakdown"'
     results = service.users().messages().list(
         userId="me", q=query, maxResults=MAX_EMAILS
     ).execute()

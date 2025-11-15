@@ -105,6 +105,38 @@ const RangeSelector: React.FC<{
     </div>
   );
 };
+// ---------------------------------------------------------------------
+// Simple credit score based ONLY on average monthly earnings (USD)
+// ---------------------------------------------------------------------
+function calculateDemoCreditScore(parsed: ParsedEarning[]): number {
+  if (!parsed || parsed.length === 0) return 575; // neutral fallback
+
+  // 1. Aggregate by month (YYYY-MM)
+  const monthlyTotals = new Map<string, number>();
+  for (const p of parsed) {
+    const y = p.date.getFullYear();
+    const m = String(p.date.getMonth() + 1).padStart(2, "0");
+    const key = `${y}-${m}`;
+    monthlyTotals.set(key, (monthlyTotals.get(key) ?? 0) + p.amountUsd);
+  }
+
+  if (monthlyTotals.size === 0) return 575;
+
+  // 2. Compute average monthly earnings
+  const avgMonthly =
+    [...monthlyTotals.values()].reduce((a, b) => a + b, 0) / monthlyTotals.size;
+
+  // 3. Normalize to a 300–850 credit score
+  const minIncome = 100; // $100/month → lowest
+  const maxIncome = 2000; // $2000/month → highest
+
+  const clamped = Math.min(Math.max(avgMonthly, minIncome), maxIncome);
+
+  const score =
+    300 + ((clamped - minIncome) / (maxIncome - minIncome)) * (850 - 300);
+
+  return Math.round(score);
+}
 
 // choose latest dummy_earnings_YYYYMMDD_x.json
 function pickLatestEarningsFilename(names: string[]): string | null {
@@ -209,7 +241,7 @@ const EarningsScreen: React.FC = () => {
   const [range, setRange] = useState<Range>("year");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [gbpToUsd, setGbpToUsd] = useState<number>(1.25); // fallback 1 GBP ≈ 1.25 USD
+  const [gbpToUsd, setGbpToUsd] = useState<number>(1.3172); // fallback 1 GBP ≈ 1.25 USD
 
   useEffect(() => {
     const fetchLatest = async () => {
@@ -290,6 +322,9 @@ const EarningsScreen: React.FC = () => {
         .filter((r) => r.date && !Number.isNaN(r.amountUsd)) as ParsedEarning[],
     [rawData, gbpToUsd]
   );
+  const creditScore = useMemo(() => {
+    return calculateDemoCreditScore(parsed);
+  }, [parsed]);
 
   const { series, netTotal, monthlyTotal } = useMemo(() => {
     if (parsed.length === 0) {
@@ -385,7 +420,7 @@ const EarningsScreen: React.FC = () => {
           label="Monthly Earnings"
           value={formatCurrency(monthlyTotal)}
         />
-        <SummaryCard label="Credit Score" value="742" />
+        <SummaryCard label="Credit Score" value={String(creditScore)} />
       </div>
 
       {/* chart + controls */}
