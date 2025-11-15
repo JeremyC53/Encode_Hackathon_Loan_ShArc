@@ -9,3 +9,5 @@ backend/app/__pycache__/schemas.cpython-310.pyc
 data_sources/__pycache__/
 .env
 backend/.env
+backend/.venv312
+.venv312
