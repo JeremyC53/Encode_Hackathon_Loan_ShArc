@@ -2,36 +2,30 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
 
+# from data_sources.google_mail import main as google_mail_main
 from .routes import router
-from data_sources.google_mail import main as google_mail_main
 
 
 def create_app() -> FastAPI:
-    """
-    Application factory so we can import the app in tests or ASGI servers.
-    """
-
     app = FastAPI(
         title="Loan ShArc Backend",
         version="0.1.0",
         description="API gateway for ingesting freelancer payout histories.",
     )
 
-    # ⭐ Add CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],   # or ["http://localhost:5173"]
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    # ⭐ Include router from /routes
     app.include_router(router)
 
-    # ⭐ Add your custom endpoints here
+    # Temporarily disabled Gmail ingestion helper routes; keep for future reuse.
+    """
     @app.post("/run-google-mail")
     def run_google_mail():
         google_mail_main()
@@ -43,6 +37,7 @@ def create_app() -> FastAPI:
             content = f.read()
         print(">>> /uber-earnings hit")
         return content
+    """
 
     return app
 
