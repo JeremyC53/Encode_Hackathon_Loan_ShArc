@@ -250,23 +250,34 @@ const EarningsScreen: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // 1) get today's GBP→USD rate (no key required)
+        //
+        // 1) get today's GBP→USD rate from Yahoo Finance
+        //
         try {
           const resp = await fetch(
-            "https://api.exchangerate.host/latest?base=GBP&symbols=USD"
+            "https://query1.finance.yahoo.com/v7/finance/quote?symbols=GBPUSD=X"
           );
+
           if (resp.ok) {
             const data = await resp.json();
-            const rate = data?.rates?.USD;
+
+            const rate = data?.quoteResponse?.result?.[0]?.regularMarketPrice;
+
             if (typeof rate === "number" && rate > 0) {
               setGbpToUsd(rate);
+            } else {
+              console.warn("Yahoo returned invalid price:", rate);
             }
+          } else {
+            console.warn("Yahoo API error:", resp.status);
           }
         } catch (fxErr) {
-          console.warn("FX fetch failed, using fallback 1.25", fxErr);
+          console.warn("Yahoo FX fetch failed, using fallback", fxErr);
         }
 
+        //
         // 2) list earnings files in Supabase
+        //
         const { data: files, error: listError } = await supabase.storage
           .from("earnings")
           .list("", { limit: 1000 });
@@ -290,7 +301,9 @@ const EarningsScreen: React.FC = () => {
           return;
         }
 
+        //
         // 3) download that file
+        //
         const { data: fileData, error: downloadError } = await supabase.storage
           .from("earnings")
           .download(latestName);
