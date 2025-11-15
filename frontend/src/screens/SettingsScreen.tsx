@@ -52,7 +52,7 @@ const SettingsScreen: React.FC = () => {
     <div>
       <h1 style={{ fontSize: 24, marginBottom: 8 }}>Settings</h1>
       <p style={{ color: "#9ca3af", marginBottom: 24 }}>
-        Connect your accounts to power the demo.
+        Connect your accounts for automated retrieval of your frelance earnings.
       </p>
 
       <div
