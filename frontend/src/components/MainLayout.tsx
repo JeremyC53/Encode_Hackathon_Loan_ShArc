@@ -26,7 +26,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   return (
     <div style={styles.app}>
       <aside style={styles.sidebar}>
-        <div style={styles.logo}>Hackathon Bank</div>
+        <div style={styles.logo}>Loan Sh(Arc)</div>
 
         <nav style={styles.nav}>
           {navItems.map((item) => (
