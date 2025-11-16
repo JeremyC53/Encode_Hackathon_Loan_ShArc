@@ -141,7 +141,9 @@ const DashboardScreen: React.FC = () => {
       >
         <div style={cardStyle}>
           <div style={cardTitle}>Total Balance</div>
-          <div style={cardBig}>£12,340.50</div>
+          <div style={cardBig}>
+            {isFetchingBalance ? "Loading..." : `${balance} USDC`}
+          </div>
         </div>
         <div style={cardStyle}>
           <div style={cardTitle}>Active Loans</div>

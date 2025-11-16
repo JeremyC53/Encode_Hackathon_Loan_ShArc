@@ -8,3 +8,8 @@ backend/app/__pycache__/main.cpython-310.pyc
 backend/app/__pycache__/routes.cpython-310.pyc
 backend/app/__pycache__/schemas.cpython-310.pyc
 data_sources/__pycache__/
+.env
+.venv312
+frontend/src/screens/test.py
+frontend/src/screens/test2.py
+token.json
