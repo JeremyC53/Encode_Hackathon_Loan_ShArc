@@ -1,16 +1,12 @@
 // src/screens/EarningsScreen.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { parseEarnings, calculateCreditScore } from "../utils/earningsUtils";
 
 type RawEarning = {
   date: string; // "11-15-2025"
   company: string;
   earnings: string; // "$39.51" or "£829.30"
-};
-
-type ParsedEarning = {
-  date: Date;
-  amountUsd: number;
 };
 
 type Range = "week" | "month" | "year";
@@ -105,38 +101,6 @@ const RangeSelector: React.FC<{
     </div>
   );
 };
-// ---------------------------------------------------------------------
-// Simple credit score based ONLY on average monthly earnings (USD)
-// ---------------------------------------------------------------------
-function calculateDemoCreditScore(parsed: ParsedEarning[]): number {
-  if (!parsed || parsed.length === 0) return 575; // neutral fallback
-
-  // 1. Aggregate by month (YYYY-MM)
-  const monthlyTotals = new Map<string, number>();
-  for (const p of parsed) {
-    const y = p.date.getFullYear();
-    const m = String(p.date.getMonth() + 1).padStart(2, "0");
-    const key = `${y}-${m}`;
-    monthlyTotals.set(key, (monthlyTotals.get(key) ?? 0) + p.amountUsd);
-  }
-
-  if (monthlyTotals.size === 0) return 575;
-
-  // 2. Compute average monthly earnings
-  const avgMonthly =
-    [...monthlyTotals.values()].reduce((a, b) => a + b, 0) / monthlyTotals.size;
-
-  // 3. Normalize to a 300–850 credit score
-  const minIncome = 100; // $100/month → lowest
-  const maxIncome = 2000; // $2000/month → highest
-
-  const clamped = Math.min(Math.max(avgMonthly, minIncome), maxIncome);
-
-  const score =
-    300 + ((clamped - minIncome) / (maxIncome - minIncome)) * (850 - 300);
-
-  return Math.round(score);
-}
 
 // choose latest dummy_earnings_YYYYMMDD_x.json
 function pickLatestEarningsFilename(names: string[]): string | null {
@@ -311,19 +275,12 @@ const EarningsScreen: React.FC = () => {
     fetchLatest();
   }, []);
 
-  // parse & normalise to USD
-  const parsed: ParsedEarning[] = useMemo(
-    () =>
-      rawData
-        .map((r) => ({
-          date: parseUsDate(r.date),
-          amountUsd: parseAmountToUsd(r.earnings, gbpToUsd),
-        }))
-        .filter((r) => r.date && !Number.isNaN(r.amountUsd)) as ParsedEarning[],
-    [rawData, gbpToUsd]
-  );
+  const parsed = useMemo(() => {
+    return parseEarnings(rawData, gbpToUsd);
+  }, [rawData, gbpToUsd]);
+
   const creditScore = useMemo(() => {
-    return calculateDemoCreditScore(parsed);
+    return calculateCreditScore(parsed);
   }, [parsed]);
 
   const { series, netTotal, monthlyTotal } = useMemo(() => {
