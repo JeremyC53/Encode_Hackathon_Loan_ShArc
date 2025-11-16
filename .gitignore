@@ -11,3 +11,4 @@ data_sources/__pycache__/
 .env
 frontend/src/screens/test.py
 frontend/src/screens/test2.py
+.venv312
