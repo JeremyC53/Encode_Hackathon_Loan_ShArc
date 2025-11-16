@@ -12,3 +12,4 @@ data_sources/__pycache__/
 frontend/src/screens/test.py
 frontend/src/screens/test2.py
 token.json
+data_sources/uber_earnings.csv
