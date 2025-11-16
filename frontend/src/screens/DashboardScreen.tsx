@@ -1,13 +1,136 @@
 // screens/DashboardScreen.tsx
 import React from "react";
+import { useWallet } from "../contexts/WalletContext";
 
 const DashboardScreen: React.FC = () => {
+  const {
+    walletAddress,
+    balance,
+    isConnecting,
+    isFetchingBalance,
+    connectWallet,
+    disconnectWallet,
+    refreshBalance,
+  } = useWallet();
+
   return (
     <div>
-      <h1 style={{ fontSize: 24, marginBottom: 8 }}>Dashboard</h1>
-      <p style={{ color: "#9ca3af", marginBottom: 24 }}>
-        Quick overview of your hackathon bank app.
-      </p>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 24,
+        }}
+      >
+        <div>
+          <h1 style={{ fontSize: 24, marginBottom: 8 }}>Dashboard</h1>
+          <p style={{ color: "#9ca3af", margin: 0 }}>
+            Quick overview of your hackathon bank app.
+          </p>
+        </div>
+
+        <div style={{ textAlign: "right" }}>
+          {!walletAddress ? (
+            <button
+              onClick={connectWallet}
+              disabled={isConnecting}
+              style={{
+                padding: "10px 20px",
+                fontSize: 14,
+                fontWeight: 600,
+                background:
+                  "linear-gradient(135deg, rgba(59,130,246,0.95), rgba(79,70,229,0.95))",
+                color: "white",
+                border: "none",
+                borderRadius: 8,
+                cursor: isConnecting ? "not-allowed" : "pointer",
+                opacity: isConnecting ? 0.6 : 1,
+              }}
+            >
+              {isConnecting ? "Connecting..." : "🦊 Connect Wallet"}
+            </button>
+          ) : (
+            <div
+              style={{
+                backgroundColor: "#020617",
+                border: "1px solid rgba(34, 197, 94, 0.5)",
+                borderRadius: 12,
+                padding: "12px 16px",
+                minWidth: 220,
+              }}
+            >
+              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>
+                Connected to Arc Testnet
+              </div>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: "#22c55e",
+                  fontWeight: 600,
+                  marginBottom: 8,
+                }}
+              >
+                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+              </div>
+              <div
+                style={{
+                  borderTop: "1px solid rgba(148,163,184,0.2)",
+                  paddingTop: 8,
+                  marginBottom: 8,
+                }}
+              >
+                <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}>
+                  Balance
+                </div>
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: "#22c55e",
+                  }}
+                >
+                  {isFetchingBalance ? "Loading..." : `${balance} USDC`}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={refreshBalance}
+                  disabled={isFetchingBalance}
+                  style={{
+                    flex: 1,
+                    padding: "6px 10px",
+                    fontSize: 11,
+                    backgroundColor: "rgba(59,130,246,0.2)",
+                    color: "#60a5fa",
+                    border: "1px solid rgba(59,130,246,0.3)",
+                    borderRadius: 6,
+                    cursor: isFetchingBalance ? "not-allowed" : "pointer",
+                    opacity: isFetchingBalance ? 0.6 : 1,
+                  }}
+                >
+                  🔄 Refresh
+                </button>
+                <button
+                  onClick={disconnectWallet}
+                  style={{
+                    flex: 1,
+                    padding: "6px 10px",
+                    fontSize: 11,
+                    backgroundColor: "rgba(239, 68, 68, 0.2)",
+                    color: "#f87171",
+                    border: "1px solid rgba(239, 68, 68, 0.3)",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                  }}
+                >
+                  Disconnect
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       <div
         style={{
