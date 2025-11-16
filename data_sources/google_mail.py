@@ -35,18 +35,18 @@ def get_supabase_client() -> Client:
 def get_service():
     """Authenticate and return a Gmail API service."""
     creds = None
-    if os.path.exists("secrets/token.json"):
-        creds = Credentials.from_authorized_user_file("secrets/token.json", SCOPES)
+    if os.path.exists("data_sources/token.json"):
+        creds = Credentials.from_authorized_user_file("data_sources/token.json", SCOPES)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                "secrets/credentials.json", SCOPES
+                "data_sources/credentials.json", SCOPES
             )
             creds = flow.run_local_server(port=0)
-        with open("secrets/token.json", "w") as token:
+        with open("data_sources/token.json", "w") as token:
             token.write(creds.to_json())
 
     return build("gmail", "v1", credentials=creds)
