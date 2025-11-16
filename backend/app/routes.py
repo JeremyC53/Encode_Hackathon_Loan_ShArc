@@ -193,6 +193,47 @@ def get_borrower_loans_endpoint(address: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/loans/borrower/{address}/details")
+def get_borrower_loans_with_details(address: str):
+    """
+    Get all loans with full details for a borrower address
+    
+    This endpoint:
+    1. Gets all loan IDs for the borrower using getBorrowerLoans()
+    2. Fetches detailed information for each loan using loans() function
+    3. Returns complete loan data including principal, fees, repayment status, etc.
+    
+    This is a read-only operation (no gas required)
+    """
+    if not contract_service:
+        raise HTTPException(
+            status_code=503,
+            detail="Contract service not initialized. Check WALLET_PRIVATE_KEY in .env"
+        )
+    try:
+        # Get all loan IDs for the borrower
+        loan_ids = contract_service.get_borrower_loans(address)
+        
+        # Fetch details for each loan
+        loans_details = []
+        for loan_id in loan_ids:
+            try:
+                loan_detail = contract_service.get_loan_details(loan_id)
+                loans_details.append(loan_detail)
+            except Exception as e:
+                # If a specific loan fails, log it but continue with others
+                print(f"Warning: Failed to fetch details for loan {loan_id}: {str(e)}")
+                continue
+        
+        return {
+            "borrower": address,
+            "loan_count": len(loans_details),
+            "loans": loans_details
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/loans/{loan_id}/details", response_model=LoanDetailsResponse)
 def get_loan_details_endpoint(loan_id: int):
     """
@@ -315,6 +356,71 @@ def fund_contract_endpoint(request: FundContractRequest):
             request.amount,
             request.wait_for_confirmation
         )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Credit Score Endpoints
+# ============================================================================
+
+class SetCreditScoreRequest(BaseModel):
+    """Request model for setting credit score"""
+    user_address: str
+    score: int
+    wait_for_confirmation: bool = False  # Optional: wait for tx to be mined
+
+
+@router.post("/credit-score/set")
+def set_credit_score_endpoint(request: SetCreditScoreRequest):
+    """
+    Set credit score for a user address
+    
+    This operation writes to the blockchain and requires gas (paid in USDC on Arc)
+    Only the admin (backend wallet) can call this function.
+    
+    Parameters:
+    - user_address: The wallet address of the user (required)
+    - score: The credit score to set as uint256 (required, must be > 0)
+    - wait_for_confirmation: (Optional) Wait for transaction to be mined (default: False)
+    
+    Response:
+    - If wait_for_confirmation=False: Returns immediately with tx_hash (status: "submitted")
+    - If wait_for_confirmation=True: Waits up to 60s for confirmation (status: "success", "failed", or "pending")
+    """
+    if not contract_service:
+        raise HTTPException(
+            status_code=503,
+            detail="Contract service not initialized. Check WALLET_PRIVATE_KEY in .env"
+        )
+    try:
+        result = contract_service.set_credit_score(
+            request.user_address,
+            request.score,
+            request.wait_for_confirmation
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/credit-score/{address}")
+def get_credit_score_endpoint(address: str):
+    """
+    Get credit score for a user address
+    
+    This is a read-only operation (no gas required)
+    
+    Returns the credit score and the timestamp of when it was last updated
+    """
+    if not contract_service:
+        raise HTTPException(
+            status_code=503,
+            detail="Contract service not initialized. Check WALLET_PRIVATE_KEY in .env"
+        )
+    try:
+        result = contract_service.get_credit_score(address)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

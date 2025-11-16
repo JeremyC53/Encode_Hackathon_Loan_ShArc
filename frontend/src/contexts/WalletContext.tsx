@@ -28,7 +28,7 @@ const ARC_TESTNET_CONFIG = {
     symbol: "USDC",
     decimals: 18,
   },
-  rpcUrls: ["https://rpc.testnet.arc.network"],
+  rpcUrls: ["https://evocative-patient-dust.arc-testnet.quiknode.pro/106d4e9c481f02b2f523dc3ff495ad3b835e3939"],
   blockExplorerUrls: ["https://testnet.arcscan.app"],
 };
 

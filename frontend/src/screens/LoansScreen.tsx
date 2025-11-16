@@ -1,5 +1,5 @@
 // screens/LoansScreen.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useWallet } from "../contexts/WalletContext";
 
 // Add custom CSS for range slider
@@ -12,8 +12,8 @@ const sliderStyles = `
     border-radius: 50%;
     background: #3b82f6;
     cursor: pointer;
-    border: 3px solid white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    border: 3px solid #020617;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.5);
   }
 
   input[type="range"]::-moz-range-thumb {
@@ -22,12 +22,13 @@ const sliderStyles = `
     border-radius: 50%;
     background: #3b82f6;
     cursor: pointer;
-    border: 3px solid white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    border: 3px solid #020617;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.5);
   }
 `;
 
 import { repayLoan } from "../contracts/contractUtils";
+import { createClient } from "@supabase/supabase-js";
 
 type Loan = {
   id: number; // Loan ID from smart contract
@@ -35,12 +36,61 @@ type Loan = {
   amount: string;
   status: string;
   next: string;
+  borrower?: string;
+  principal?: number;
+  service_fee?: number;
+  total_owed?: number;
+  amount_repaid?: number;
+  timestamp?: number;
+  active?: boolean;
 };
+
+type RawEarning = {
+  date: string;
+  company: string;
+  earnings: string;
+};
+
+const supabaseUrl = `https://${import.meta.env.VITE_SUPABASE_ID}.supabase.co`;
+const supabaseKey = import.meta.env.VITE_SUPABASE_KEY as string;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Helper function to parse amount string to USD
+function parseAmountToUsd(amountStr: string, gbpToUsd: number): number {
+  const cleanStr = amountStr.replace(/[,$£]/g, "").trim();
+  const val = Number.parseFloat(cleanStr);
+  if (Number.isNaN(val)) return 0;
+  // If original string had £, convert to USD
+  if (amountStr.includes("£")) {
+    return val * gbpToUsd;
+  }
+  return val;
+}
+
+// Helper to pick latest earnings file
+function pickLatestEarningsFilename(names: string[]): string | null {
+  const regex = /^dummy_earnings_(\d{8})_(\d+)\.json$/;
+  let best: { date: string; index: number; name: string } | null = null;
+
+  for (const name of names) {
+    const match = name.match(regex);
+    if (!match) continue;
+    const [, dateStr, indexStr] = match;
+    const index = Number.parseInt(indexStr, 10);
+
+    if (!best || dateStr > best.date || (dateStr === best.date && index > best.index)) {
+      best = { date: dateStr, index, name };
+    }
+  }
+
+  return best ? best.name : null;
+}
 
 const LoansScreen: React.FC = () => {
   const [loanAmount, setLoanAmount] = useState(1500);
   const [selectedPlan, setSelectedPlan] = useState<1 | 3 | 6>(3);
-  const availableLimit = 5000;
+  const [availableLimit, setAvailableLimit] = useState(5000); // Default limit
+  const [isLoadingLimit, setIsLoadingLimit] = useState(false);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -49,11 +99,9 @@ const LoansScreen: React.FC = () => {
   const [isRepaying, setIsRepaying] = useState(false);
   const [isIssuingLoan, setIsIssuingLoan] = useState(false);
 
-  const loans: Loan[] = [
-    { id: 0, name: "Freelancer Gear", amount: "3500", status: "Active", next: "1 Apr" },
-    { id: 1, name: "Laptop Upgrade", amount: "1200", status: "Active", next: "15 Mar" },
-    { id: 2, name: "Travel Float", amount: "800", status: "Paid off", next: "-" },
-  ];
+  // Loans state
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [isLoadingLoans, setIsLoadingLoans] = useState(false);
 
   const repaymentPlans = [
     { months: 1, label: "1 Month", payment: loanAmount, dueDate: "Jun 15, 2024" },
@@ -75,6 +123,57 @@ const LoansScreen: React.FC = () => {
     setIsModalOpen(false);
     setSelectedLoan(null);
     setRepayAmount("");
+  };
+
+  // Function to refresh loans list
+  const refreshLoans = async () => {
+    if (!walletAddress) return;
+    
+    try {
+      setIsLoadingLoans(true);
+      
+      const response = await fetch(
+        `http://localhost:8000/api/loans/borrower/${walletAddress}/details`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch loans: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      const transformedLoans: Loan[] = data.loans.map((loan: any) => {
+        const remainingBalance = loan.total_owed - loan.amount_repaid;
+        const isActive = loan.active;
+        
+        const nextPaymentDate = new Date((loan.timestamp + 30 * 24 * 60 * 60) * 1000);
+        const nextPaymentStr = isActive 
+          ? nextPaymentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          : "-";
+        
+        return {
+          id: loan.id,
+          name: `Loan #${loan.id}`,
+          amount: remainingBalance.toFixed(2),
+          status: isActive ? "Active" : "Paid off",
+          next: nextPaymentStr,
+          borrower: loan.borrower,
+          principal: loan.principal,
+          service_fee: loan.service_fee,
+          total_owed: loan.total_owed,
+          amount_repaid: loan.amount_repaid,
+          timestamp: loan.timestamp,
+          active: loan.active,
+        };
+      });
+
+      setLoans(transformedLoans);
+      console.log(`Refreshed ${transformedLoans.length} loans`);
+    } catch (error) {
+      console.error("Error refreshing loans:", error);
+    } finally {
+      setIsLoadingLoans(false);
+    }
   };
 
   const handleSubmitRepayment = async () => {
@@ -103,6 +202,14 @@ const LoansScreen: React.FC = () => {
       );
       
       handleCloseModal();
+      
+      // Refresh loans list to show updated balances
+      setTimeout(() => refreshLoans(), 2000); // Wait 2 seconds for blockchain to update
+      
+      // Refresh wallet balance
+      if (refreshBalance) {
+        setTimeout(() => refreshBalance(), 2000);
+      }
     } catch (error: any) {
       console.error("Repayment error:", error);
       alert(
@@ -143,8 +250,8 @@ const LoansScreen: React.FC = () => {
         },
         body: JSON.stringify({
           borrower_address: walletAddress,
-          principal: 0.002,
-          wait_for_confirmation: false,
+          principal: loanAmount,
+          wait_for_confirmation: true,
         }),
       });
 
@@ -159,16 +266,18 @@ const LoansScreen: React.FC = () => {
         `✅ Loan Issued Successfully!\n\n` +
         `Amount: ${loanAmount} USDC\n` +
         `Borrower: ${walletAddress}\n` +
-        `Transaction Hash: ${result.tx_hash}\n` +
-        `Loan ID: ${result.loan_id || "Pending"}\n\n` +
+        `Transaction Hash: ${result.transaction_hash}\n\n` +
         `View on Arc Testnet Explorer:\n` +
-        `https://testnet.arcscan.app/tx/${result.tx_hash}`
+        `https://testnet.arcscan.app/tx/${result.transaction_hash}`
       );
       
       // Refresh wallet balance to reflect received loan
       if (refreshBalance) {
-        refreshBalance();
+        setTimeout(() => refreshBalance(), 2000);
       }
+      
+      // Refresh loans list to show the new loan
+      setTimeout(() => refreshLoans(), 2000);
     } catch (error: any) {
       console.error("Loan issuance error:", error);
       alert(
@@ -192,6 +301,154 @@ const LoansScreen: React.FC = () => {
     disconnectWallet,
     refreshBalance,
   } = useWallet();
+
+  // Fetch borrowing limit based on user earnings (50% of total earnings)
+  useEffect(() => {
+    const fetchBorrowingLimit = async () => {
+      if (!walletAddress) {
+        setAvailableLimit(5000); // Default limit when no wallet connected
+        return;
+      }
+
+      try {
+        setIsLoadingLimit(true);
+
+        // Get current GBP to USD rate
+        let gbpToUsd = 1.3172; // fallback
+        try {
+          const fxResp = await fetch("https://api.exchangerate.host/latest?base=GBP&symbols=USD");
+          if (fxResp.ok) {
+            const fxData = await fxResp.json();
+            const rate = fxData?.rates?.USD;
+            if (typeof rate === "number" && rate > 0) {
+              gbpToUsd = rate;
+            }
+          }
+        } catch (fxErr) {
+          console.warn("FX fetch failed, using fallback", fxErr);
+        }
+
+        // List earnings files in Supabase
+        const { data: files, error: listError } = await supabase.storage
+          .from("earnings")
+          .list("", { limit: 1000 });
+
+        if (listError) throw listError;
+
+        if (!files || files.length === 0) {
+          console.warn("No earnings files found");
+          setAvailableLimit(5000);
+          return;
+        }
+
+        const latestName = pickLatestEarningsFilename(files.map((f: { name: string }) => f.name));
+
+        if (!latestName) {
+          console.warn("No matching earnings file found");
+          setAvailableLimit(5000);
+          return;
+        }
+
+        // Download the earnings file
+        const { data: fileData, error: downloadError } = await supabase.storage
+          .from("earnings")
+          .download(latestName);
+
+        if (downloadError || !fileData) throw downloadError;
+
+        const text = await fileData.text();
+        const earningsData = JSON.parse(text) as RawEarning[];
+
+        // Calculate total earnings in USD
+        let totalEarnings = 0;
+        for (const earning of earningsData) {
+          totalEarnings += parseAmountToUsd(earning.earnings, gbpToUsd);
+        }
+
+        // Set borrowing limit to 50% of total earnings, rounded to nearest 100
+        const borrowingLimit = Math.round((totalEarnings * 0.5) / 100) * 100 * 0.1;
+        const finalLimit = Math.max(100, borrowingLimit); // Minimum $100
+        
+        setAvailableLimit(finalLimit);
+        // Adjust loan amount if it exceeds the new limit
+        setLoanAmount((prevAmount) => Math.min(prevAmount, finalLimit));
+        
+        console.log(`Total earnings: $${totalEarnings.toFixed(2)}`);
+        console.log(`Borrowing limit set to $${borrowingLimit} `);
+      } catch (error) {
+        console.error("Error fetching borrowing limit:", error);
+        // Fall back to default limit on error
+        setAvailableLimit(5000);
+      } finally {
+        setIsLoadingLimit(false);
+      }
+    };
+
+    fetchBorrowingLimit();
+  }, [walletAddress]);
+
+  // Fetch borrower's loans from the blockchain
+  useEffect(() => {
+    const fetchBorrowerLoans = async () => {
+      if (!walletAddress) {
+        setLoans([]);
+        return;
+      }
+
+      try {
+        setIsLoadingLoans(true);
+        
+        // Call the new API endpoint to get all loans with details
+        const response = await fetch(
+          `http://localhost:8000/api/loans/borrower/${walletAddress}/details`
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch loans: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        // Transform API response to match our Loan type
+        const transformedLoans: Loan[] = data.loans.map((loan: any) => {
+          const remainingBalance = loan.total_owed - loan.amount_repaid;
+          const isActive = loan.active;
+          
+          // Calculate next payment date (simple estimation - 30 days from loan timestamp)
+          const nextPaymentDate = new Date((loan.timestamp + 30 * 24 * 60 * 60) * 1000);
+          const nextPaymentStr = isActive 
+            ? nextPaymentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            : "-";
+          
+          return {
+            id: loan.id,
+            name: `Loan #${loan.id}`,
+            amount: remainingBalance.toFixed(2),
+            status: isActive ? "Active" : "Paid off",
+            next: nextPaymentStr,
+            borrower: loan.borrower,
+            principal: loan.principal,
+            service_fee: loan.service_fee,
+            total_owed: loan.total_owed,
+            amount_repaid: loan.amount_repaid,
+            timestamp: loan.timestamp,
+            active: loan.active,
+          };
+        });
+
+        setLoans(transformedLoans);
+        console.log(`Fetched ${transformedLoans.length} loans for ${walletAddress}`);
+      } catch (error) {
+        console.error("Error fetching borrower loans:", error);
+        // Set empty array on error but don't show alert to avoid interrupting user
+        setLoans([]);
+      } finally {
+        setIsLoadingLoans(false);
+      }
+    };
+
+    fetchBorrowerLoans();
+  }, [walletAddress]);
 
   return (
     <div>
@@ -292,11 +549,11 @@ const LoansScreen: React.FC = () => {
       {/* Loan Application Card */}
       <div
         style={{
-          backgroundColor: "#ffffff",
+          backgroundColor: "#020617",
           borderRadius: 16,
           padding: 32,
           marginBottom: 32,
-          boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
+          border: "1px solid rgba(148,163,184,0.3)",
         }}
       >
         {/* Amount Slider */}
@@ -309,11 +566,11 @@ const LoansScreen: React.FC = () => {
               marginBottom: 16,
             }}
           >
-            <h2 style={{ fontSize: 18, color: "#0f172a", margin: 0 }}>
+            <h2 style={{ fontSize: 18, color: "#f9fafb", margin: 0 }}>
               How much do you need?
             </h2>
             <span
-              style={{ fontSize: 24, fontWeight: 700, color: "#0f172a" }}
+              style={{ fontSize: 24, fontWeight: 700, color: "#f9fafb" }}
             >
               ${loanAmount.toLocaleString()}
             </span>
@@ -321,9 +578,9 @@ const LoansScreen: React.FC = () => {
 
           <input
             type="range"
-            min="100"
+            min="1"
             max={availableLimit}
-            step="50"
+            step="5"
             value={loanAmount}
             onChange={handleSliderChange}
             style={{
@@ -333,67 +590,27 @@ const LoansScreen: React.FC = () => {
               outline: "none",
               background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${
                 (loanAmount / availableLimit) * 100
-              }%, #e5e7eb ${(loanAmount / availableLimit) * 100}%, #e5e7eb 100%)`,
+              }%, #374151 ${(loanAmount / availableLimit) * 100}%, #374151 100%)`,
               WebkitAppearance: "none",
               appearance: "none",
               cursor: "pointer",
             }}
           />
 
-          <p style={{ color: "#6b7280", fontSize: 14, marginTop: 8 }}>
-            Your available limit: ${availableLimit.toLocaleString()}
+          <p style={{ color: "#9ca3af", fontSize: 14, marginTop: 8 }}>
+            {isLoadingLimit ? (
+              <span>Calculating your personalized limit...</span>
+            ) : (
+              <span>
+                Your available limit: <strong style={{ color: "#3b82f6" }}>${availableLimit.toLocaleString()}</strong>
+                {walletAddress && <span style={{ fontSize: 12, marginLeft: 8 }}>(50% of total earnings)</span>}
+              </span>
+            )}
           </p>
         </div>
 
         {/* Repayment Plan */}
-        <div style={{ marginBottom: 32 }}>
-          <h3 style={{ fontSize: 18, color: "#0f172a", marginBottom: 16 }}>
-            Choose your repayment plan
-          </h3>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: 16,
-            }}
-          >
-            {repaymentPlans.map((plan) => (
-              <button
-                key={plan.months}
-                onClick={() => setSelectedPlan(plan.months as 1 | 3 | 6)}
-                style={{
-                  backgroundColor: "#ffffff",
-                  border:
-                    selectedPlan === plan.months
-                      ? "2px solid #3b82f6"
-                      : "1px solid #e5e7eb",
-                  borderRadius: 12,
-                  padding: 20,
-                  cursor: "pointer",
-                  textAlign: "left",
-                  transition: "all 0.2s",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 600,
-                    color: "#0f172a",
-                    marginBottom: 8,
-                  }}
-                >
-                  {plan.label}
-                </div>
-                <div style={{ fontSize: 14, color: "#6b7280" }}>
-                  {plan.months === 1
-                    ? `Pay by ${plan.dueDate}`
-                    : `${plan.payments} payments of $${plan.payment}`}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
+      
 
         {/* Review Button */}
         <button
@@ -405,21 +622,23 @@ const LoansScreen: React.FC = () => {
             fontSize: 16,
             fontWeight: 600,
             color: "#ffffff",
-            backgroundColor: isIssuingLoan || !walletAddress ? "#9ca3af" : "#3b82f6",
+            background: isIssuingLoan || !walletAddress 
+              ? "rgba(156,163,175,0.5)" 
+              : "linear-gradient(135deg, rgba(59,130,246,0.95), rgba(79,70,229,0.95))",
             border: "none",
             borderRadius: 12,
             cursor: isIssuingLoan || !walletAddress ? "not-allowed" : "pointer",
-            transition: "background-color 0.2s",
-            opacity: isIssuingLoan || !walletAddress ? 0.7 : 1,
+            transition: "all 0.2s",
+            opacity: isIssuingLoan || !walletAddress ? 0.6 : 1,
           }}
           onMouseOver={(e) => {
             if (!isIssuingLoan && walletAddress) {
-              e.currentTarget.style.backgroundColor = "#2563eb";
+              e.currentTarget.style.background = "linear-gradient(135deg, rgba(37,99,235,0.95), rgba(67,56,202,0.95))";
             }
           }}
           onMouseOut={(e) => {
             if (!isIssuingLoan && walletAddress) {
-              e.currentTarget.style.backgroundColor = "#3b82f6";
+              e.currentTarget.style.background = "linear-gradient(135deg, rgba(59,130,246,0.95), rgba(79,70,229,0.95))";
             }
           }}
         >
@@ -432,59 +651,121 @@ const LoansScreen: React.FC = () => {
         Your Existing Loans
       </h2>
 
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          backgroundColor: "#020617",
-          borderRadius: 16,
-          overflow: "hidden",
-        }}
-      >
-        <thead>
-          <tr style={{ backgroundColor: "#020617" }}>
-            <th style={thStyle}>Loan</th>
-            <th style={thStyle}>Amount</th>
-            <th style={thStyle}>Status</th>
-            <th style={thStyle}>Next Payment</th>
-            <th style={thStyle}>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loans.map((loan, idx) => (
-            <tr
-              key={loan.name}
-              style={{
-                backgroundColor: idx % 2 === 0 ? "#020617" : "#020617",
-              }}
-            >
-              <td style={tdStyle}>{loan.name}</td>
-              <td style={tdStyle}>{loan.amount} USDC</td>
-              <td style={tdStyle}>{loan.status}</td>
-              <td style={tdStyle}>{loan.next}</td>
-              <td style={tdStyle}>
-                {loan.status === "Active" && (
-                  <button
-                    onClick={() => handleRepayClick(loan)}
+      {isLoadingLoans ? (
+        <div
+          style={{
+            backgroundColor: "#020617",
+            borderRadius: 16,
+            padding: 48,
+            textAlign: "center",
+            border: "1px solid rgba(148,163,184,0.3)",
+          }}
+        >
+          <div style={{ fontSize: 16, color: "#9ca3af" }}>
+            Loading your loans...
+          </div>
+        </div>
+      ) : loans.length === 0 ? (
+        <div
+          style={{
+            backgroundColor: "#020617",
+            borderRadius: 16,
+            padding: 48,
+            textAlign: "center",
+            border: "1px solid rgba(148,163,184,0.3)",
+          }}
+        >
+          <div style={{ fontSize: 16, color: "#9ca3af", marginBottom: 8 }}>
+            {walletAddress ? "No loans found" : "Connect your wallet to view loans"}
+          </div>
+          {walletAddress && (
+            <div style={{ fontSize: 14, color: "#6b7280" }}>
+              Apply for your first loan above to get started
+            </div>
+          )}
+        </div>
+      ) : (
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            backgroundColor: "#020617",
+            borderRadius: 16,
+            overflow: "hidden",
+          }}
+        >
+          <thead>
+            <tr style={{ backgroundColor: "#020617" }}>
+              <th style={thStyle}>Loan</th>
+              <th style={thStyle}>Amount Remaining</th>
+              <th style={thStyle}>Status</th>
+              <th style={thStyle}>Next Payment</th>
+              <th style={thStyle}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loans.map((loan, idx) => (
+              <tr
+                key={loan.id}
+                style={{
+                  backgroundColor: idx % 2 === 0 ? "#020617" : "#020617",
+                }}
+              >
+                <td style={tdStyle}>
+                  <div>{loan.name}</div>
+                  {loan.principal && (
+                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                      Principal: ${loan.principal.toFixed(2)}
+                    </div>
+                  )}
+                </td>
+                <td style={tdStyle}>
+                  <div>{loan.amount} USDC</div>
+                  {loan.total_owed && loan.amount_repaid !== undefined && (
+                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                      Repaid: ${loan.amount_repaid.toFixed(2)} / ${loan.total_owed.toFixed(2)}
+                    </div>
+                  )}
+                </td>
+                <td style={tdStyle}>
+                  <span
                     style={{
-                      padding: "6px 16px",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      backgroundColor: "#3b82f6",
-                      color: "white",
-                      border: "none",
+                      padding: "4px 8px",
                       borderRadius: 6,
-                      cursor: "pointer",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      backgroundColor: loan.status === "Active" ? "rgba(34, 197, 94, 0.2)" : "rgba(156, 163, 175, 0.2)",
+                      color: loan.status === "Active" ? "#22c55e" : "#9ca3af",
                     }}
                   >
-                    Repay
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                    {loan.status}
+                  </span>
+                </td>
+                <td style={tdStyle}>{loan.next}</td>
+                <td style={tdStyle}>
+                  {loan.status === "Active" && (
+                    <button
+                      onClick={() => handleRepayClick(loan)}
+                      style={{
+                        padding: "6px 16px",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        backgroundColor: "#3b82f6",
+                        color: "white",
+                        border: "none",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Repay
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       {/* Repayment Modal */}
       {isModalOpen && (
