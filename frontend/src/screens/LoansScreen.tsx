@@ -78,7 +78,11 @@ function pickLatestEarningsFilename(names: string[]): string | null {
     const [, dateStr, indexStr] = match;
     const index = Number.parseInt(indexStr, 10);
 
-    if (!best || dateStr > best.date || (dateStr === best.date && index > best.index)) {
+    if (
+      !best ||
+      dateStr > best.date ||
+      (dateStr === best.date && index > best.index)
+    ) {
       best = { date: dateStr, index, name };
     }
   }
@@ -102,11 +106,60 @@ const LoansScreen: React.FC = () => {
   // Loans state
   const [loans, setLoans] = useState<Loan[]>([]);
   const [isLoadingLoans, setIsLoadingLoans] = useState(false);
+  // --------------------------
+  // ⭐ CHATBOT STATE
+  // --------------------------
+  const [chatInput, setChatInput] = useState("");
+  const [chatHistory, setChatHistory] = useState<
+    { sender: "user" | "bot"; text: string }[]
+  >([]);
 
+  const sendChat = async () => {
+    if (!chatInput.trim()) return;
+
+    const msg = chatInput;
+    setChatInput("");
+    setChatHistory((h) => [...h, { sender: "user", text: msg }]);
+
+    try {
+      const response = await fetch("http://localhost:8000/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: msg,
+          wallet_address: walletAddress,
+        }),
+      });
+
+      const data = await response.json();
+
+      setChatHistory((h) => [...h, { sender: "bot", text: data.reply }]);
+    } catch (err) {
+      setChatHistory((h) => [
+        ...h,
+        { sender: "bot", text: "Error contacting assistant." },
+      ]);
+    }
+  };
   const repaymentPlans = [
-    { months: 1, label: "1 Month", payment: loanAmount, dueDate: "Jun 15, 2024" },
-    { months: 3, label: "3 Months", payment: Math.round((loanAmount / 3) * 100) / 100, payments: 3 },
-    { months: 6, label: "6 Months", payment: Math.round((loanAmount / 6) * 100) / 100, payments: 6 },
+    {
+      months: 1,
+      label: "1 Month",
+      payment: loanAmount,
+      dueDate: "Jun 15, 2024",
+    },
+    {
+      months: 3,
+      label: "3 Months",
+      payment: Math.round((loanAmount / 3) * 100) / 100,
+      payments: 3,
+    },
+    {
+      months: 6,
+      label: "6 Months",
+      payment: Math.round((loanAmount / 6) * 100) / 100,
+      payments: 6,
+    },
   ];
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,10 +181,10 @@ const LoansScreen: React.FC = () => {
   // Function to refresh loans list
   const refreshLoans = async () => {
     if (!walletAddress) return;
-    
+
     try {
       setIsLoadingLoans(true);
-      
+
       const response = await fetch(
         `http://localhost:8000/api/loans/borrower/${walletAddress}/details`
       );
@@ -141,16 +194,21 @@ const LoansScreen: React.FC = () => {
       }
 
       const data = await response.json();
-      
+
       const transformedLoans: Loan[] = data.loans.map((loan: any) => {
         const remainingBalance = loan.total_owed - loan.amount_repaid;
         const isActive = loan.active;
-        
-        const nextPaymentDate = new Date((loan.timestamp + 30 * 24 * 60 * 60) * 1000);
-        const nextPaymentStr = isActive 
-          ? nextPaymentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+        const nextPaymentDate = new Date(
+          (loan.timestamp + 30 * 24 * 60 * 60) * 1000
+        );
+        const nextPaymentStr = isActive
+          ? nextPaymentDate.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            })
           : "-";
-        
+
         return {
           id: loan.id,
           name: `Loan #${loan.id}`,
@@ -189,23 +247,25 @@ const LoansScreen: React.FC = () => {
 
     try {
       setIsRepaying(true);
-      
+
       // Call the smart contract repay function
-      console.log(`Repaying ${repayAmount} USDC for Loan ID: ${selectedLoan.id}`);
+      console.log(
+        `Repaying ${repayAmount} USDC for Loan ID: ${selectedLoan.id}`
+      );
       const txHash = await repayLoan(selectedLoan.id, parseFloat(repayAmount));
-      
+
       alert(
         `Successfully repaid ${repayAmount} USDC for ${selectedLoan.name}!\n\n` +
-        `Transaction Hash: ${txHash}\n\n` +
-        `View on Arc Testnet Explorer:\n` +
-        `https://testnet.arcscan.app/tx/${txHash}`
+          `Transaction Hash: ${txHash}\n\n` +
+          `View on Arc Testnet Explorer:\n` +
+          `https://testnet.arcscan.app/tx/${txHash}`
       );
-      
+
       handleCloseModal();
-      
+
       // Refresh loans list to show updated balances
       setTimeout(() => refreshLoans(), 2000); // Wait 2 seconds for blockchain to update
-      
+
       // Refresh wallet balance
       if (refreshBalance) {
         setTimeout(() => refreshBalance(), 2000);
@@ -214,10 +274,10 @@ const LoansScreen: React.FC = () => {
       console.error("Repayment error:", error);
       alert(
         `Failed to repay loan:\n\n${error.message}\n\n` +
-        `Make sure you:\n` +
-        `1. Are connected to Arc Testnet\n` +
-        `2. Have sufficient USDC balance\n` +
-        `3. Have approved the contract`
+          `Make sure you:\n` +
+          `1. Are connected to Arc Testnet\n` +
+          `2. Have sufficient USDC balance\n` +
+          `3. Have approved the contract`
       );
     } finally {
       setIsRepaying(false);
@@ -239,9 +299,11 @@ const LoansScreen: React.FC = () => {
 
     try {
       setIsIssuingLoan(true);
-      
-      console.log(`Requesting loan of ${loanAmount} USDC for wallet: ${walletAddress}`);
-      
+
+      console.log(
+        `Requesting loan of ${loanAmount} USDC for wallet: ${walletAddress}`
+      );
+
       // Call backend API to issue loan (backend wallet issues loan to borrower)
       const response = await fetch("http://localhost:8000/api/loans/issue", {
         method: "POST",
@@ -261,31 +323,31 @@ const LoansScreen: React.FC = () => {
       }
 
       const result = await response.json();
-      
+
       alert(
         `✅ Loan Issued Successfully!\n\n` +
-        `Amount: ${loanAmount} USDC\n` +
-        `Borrower: ${walletAddress}\n` +
-        `Transaction Hash: ${result.transaction_hash}\n\n` +
-        `View on Arc Testnet Explorer:\n` +
-        `https://testnet.arcscan.app/tx/${result.transaction_hash}`
+          `Amount: ${loanAmount} USDC\n` +
+          `Borrower: ${walletAddress}\n` +
+          `Transaction Hash: ${result.transaction_hash}\n\n` +
+          `View on Arc Testnet Explorer:\n` +
+          `https://testnet.arcscan.app/tx/${result.transaction_hash}`
       );
-      
+
       // Refresh wallet balance to reflect received loan
       if (refreshBalance) {
         setTimeout(() => refreshBalance(), 2000);
       }
-      
+
       // Refresh loans list to show the new loan
       setTimeout(() => refreshLoans(), 2000);
     } catch (error: any) {
       console.error("Loan issuance error:", error);
       alert(
         `❌ Failed to issue loan:\n\n${error.message}\n\n` +
-        `Please check:\n` +
-        `1. Backend server is running (http://localhost:8000)\n` +
-        `2. Backend wallet has sufficient USDC balance\n` +
-        `3. Contract is properly configured`
+          `Please check:\n` +
+          `1. Backend server is running (http://localhost:8000)\n` +
+          `2. Backend wallet has sufficient USDC balance\n` +
+          `3. Contract is properly configured`
       );
     } finally {
       setIsIssuingLoan(false);
@@ -316,7 +378,9 @@ const LoansScreen: React.FC = () => {
         // Get current GBP to USD rate
         let gbpToUsd = 1.3172; // fallback
         try {
-          const fxResp = await fetch("https://api.exchangerate.host/latest?base=GBP&symbols=USD");
+          const fxResp = await fetch(
+            "https://api.exchangerate.host/latest?base=GBP&symbols=USD"
+          );
           if (fxResp.ok) {
             const fxData = await fxResp.json();
             const rate = fxData?.rates?.USD;
@@ -341,7 +405,9 @@ const LoansScreen: React.FC = () => {
           return;
         }
 
-        const latestName = pickLatestEarningsFilename(files.map((f: { name: string }) => f.name));
+        const latestName = pickLatestEarningsFilename(
+          files.map((f: { name: string }) => f.name)
+        );
 
         if (!latestName) {
           console.warn("No matching earnings file found");
@@ -366,13 +432,14 @@ const LoansScreen: React.FC = () => {
         }
 
         // Set borrowing limit to 50% of total earnings, rounded to nearest 100
-        const borrowingLimit = Math.round((totalEarnings * 0.5) / 100) * 100 * 0.1;
+        const borrowingLimit =
+          Math.round((totalEarnings * 0.5) / 100) * 100 * 0.1;
         const finalLimit = Math.max(100, borrowingLimit); // Minimum $100
-        
+
         setAvailableLimit(finalLimit);
         // Adjust loan amount if it exceeds the new limit
         setLoanAmount((prevAmount) => Math.min(prevAmount, finalLimit));
-        
+
         console.log(`Total earnings: $${totalEarnings.toFixed(2)}`);
         console.log(`Borrowing limit set to $${borrowingLimit} `);
       } catch (error) {
@@ -397,7 +464,7 @@ const LoansScreen: React.FC = () => {
 
       try {
         setIsLoadingLoans(true);
-        
+
         // Call the new API endpoint to get all loans with details
         const response = await fetch(
           `http://localhost:8000/api/loans/borrower/${walletAddress}/details`
@@ -408,18 +475,23 @@ const LoansScreen: React.FC = () => {
         }
 
         const data = await response.json();
-        
+
         // Transform API response to match our Loan type
         const transformedLoans: Loan[] = data.loans.map((loan: any) => {
           const remainingBalance = loan.total_owed - loan.amount_repaid;
           const isActive = loan.active;
-          
+
           // Calculate next payment date (simple estimation - 30 days from loan timestamp)
-          const nextPaymentDate = new Date((loan.timestamp + 30 * 24 * 60 * 60) * 1000);
-          const nextPaymentStr = isActive 
-            ? nextPaymentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          const nextPaymentDate = new Date(
+            (loan.timestamp + 30 * 24 * 60 * 60) * 1000
+          );
+          const nextPaymentStr = isActive
+            ? nextPaymentDate.toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+              })
             : "-";
-          
+
           return {
             id: loan.id,
             name: `Loan #${loan.id}`,
@@ -437,7 +509,9 @@ const LoansScreen: React.FC = () => {
         });
 
         setLoans(transformedLoans);
-        console.log(`Fetched ${transformedLoans.length} loans for ${walletAddress}`);
+        console.log(
+          `Fetched ${transformedLoans.length} loans for ${walletAddress}`
+        );
       } catch (error) {
         console.error("Error fetching borrower loans:", error);
         // Set empty array on error but don't show alert to avoid interrupting user
@@ -453,9 +527,16 @@ const LoansScreen: React.FC = () => {
   return (
     <div>
       <style>{sliderStyles}</style>
-      
+
       {/* Header with Wallet Info */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 24,
+        }}
+      >
         <div>
           <h1 style={{ fontSize: 24, marginBottom: 8 }}>Loans</h1>
           <p style={{ color: "#9ca3af", margin: 0 }}>
@@ -473,7 +554,8 @@ const LoansScreen: React.FC = () => {
                 padding: "10px 20px",
                 fontSize: 14,
                 fontWeight: 600,
-                background: "linear-gradient(135deg, rgba(59,130,246,0.95), rgba(79,70,229,0.95))",
+                background:
+                  "linear-gradient(135deg, rgba(59,130,246,0.95), rgba(79,70,229,0.95))",
                 color: "white",
                 border: "none",
                 borderRadius: 8,
@@ -496,14 +578,31 @@ const LoansScreen: React.FC = () => {
               <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>
                 Connected to Arc Testnet
               </div>
-              <div style={{ fontSize: 13, color: "#22c55e", fontWeight: 600, marginBottom: 8 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: "#22c55e",
+                  fontWeight: 600,
+                  marginBottom: 8,
+                }}
+              >
                 {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
               </div>
-              <div style={{ borderTop: "1px solid rgba(148,163,184,0.2)", paddingTop: 8, marginBottom: 8 }}>
-                <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}>
+              <div
+                style={{
+                  borderTop: "1px solid rgba(148,163,184,0.2)",
+                  paddingTop: 8,
+                  marginBottom: 8,
+                }}
+              >
+                <div
+                  style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
+                >
                   Balance
                 </div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#22c55e" }}>
+                <div
+                  style={{ fontSize: 18, fontWeight: 700, color: "#22c55e" }}
+                >
                   {isFetchingBalance ? "Loading..." : `${balance} USDC`}
                 </div>
               </div>
@@ -546,6 +645,75 @@ const LoansScreen: React.FC = () => {
         </div>
       </div>
 
+      {/* ----------------------------- */}
+      {/* ⭐ CHATBOT SECTION             */}
+      {/* ----------------------------- */}
+
+      <div
+        style={{
+          backgroundColor: "#0f172a",
+          padding: "20px",
+          borderRadius: 16,
+          marginBottom: 32,
+        }}
+      >
+        <h2 style={{ color: "white", marginBottom: 12 }}>
+          Ask the Loan Assistant
+        </h2>
+
+        <div
+          style={{
+            backgroundColor: "#1e293b",
+            height: 200,
+            overflowY: "auto",
+            padding: 12,
+            borderRadius: 8,
+            marginBottom: 12,
+            color: "white",
+          }}
+        >
+          {chatHistory.map((m, i) => (
+            <div key={i} style={{ marginBottom: 6 }}>
+              <strong
+                style={{ color: m.sender === "user" ? "#3b82f6" : "#22c55e" }}
+              >
+                {m.sender === "user" ? "You" : "Assistant"}:
+              </strong>{" "}
+              {m.text}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            placeholder="Ask something... (e.g. can I borrow $40?)"
+            style={{
+              flex: 1,
+              padding: 12,
+              borderRadius: 8,
+              backgroundColor: "#1e293b",
+              color: "white",
+              border: "1px solid #334155",
+            }}
+            onKeyDown={(e) => e.key === "Enter" && sendChat()}
+          />
+          <button
+            onClick={sendChat}
+            style={{
+              padding: "12px 18px",
+              backgroundColor: "#3b82f6",
+              border: "none",
+              borderRadius: 8,
+              color: "white",
+              cursor: "pointer",
+            }}
+          >
+            Send
+          </button>
+        </div>
+      </div>
       {/* Loan Application Card */}
       <div
         style={{
@@ -569,9 +737,7 @@ const LoansScreen: React.FC = () => {
             <h2 style={{ fontSize: 18, color: "#f9fafb", margin: 0 }}>
               How much do you need?
             </h2>
-            <span
-              style={{ fontSize: 24, fontWeight: 700, color: "#f9fafb" }}
-            >
+            <span style={{ fontSize: 24, fontWeight: 700, color: "#f9fafb" }}>
               ${loanAmount.toLocaleString()}
             </span>
           </div>
@@ -590,7 +756,9 @@ const LoansScreen: React.FC = () => {
               outline: "none",
               background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${
                 (loanAmount / availableLimit) * 100
-              }%, #374151 ${(loanAmount / availableLimit) * 100}%, #374151 100%)`,
+              }%, #374151 ${
+                (loanAmount / availableLimit) * 100
+              }%, #374151 100%)`,
               WebkitAppearance: "none",
               appearance: "none",
               cursor: "pointer",
@@ -602,15 +770,21 @@ const LoansScreen: React.FC = () => {
               <span>Calculating your personalized limit...</span>
             ) : (
               <span>
-                Your available limit: <strong style={{ color: "#3b82f6" }}>${availableLimit.toLocaleString()}</strong>
-                {walletAddress && <span style={{ fontSize: 12, marginLeft: 8 }}>(50% of total earnings)</span>}
+                Your available limit:{" "}
+                <strong style={{ color: "#3b82f6" }}>
+                  ${availableLimit.toLocaleString()}
+                </strong>
+                {walletAddress && (
+                  <span style={{ fontSize: 12, marginLeft: 8 }}>
+                    (50% of total earnings)
+                  </span>
+                )}
               </span>
             )}
           </p>
         </div>
 
         {/* Repayment Plan */}
-      
 
         {/* Review Button */}
         <button
@@ -622,9 +796,10 @@ const LoansScreen: React.FC = () => {
             fontSize: 16,
             fontWeight: 600,
             color: "#ffffff",
-            background: isIssuingLoan || !walletAddress 
-              ? "rgba(156,163,175,0.5)" 
-              : "linear-gradient(135deg, rgba(59,130,246,0.95), rgba(79,70,229,0.95))",
+            background:
+              isIssuingLoan || !walletAddress
+                ? "rgba(156,163,175,0.5)"
+                : "linear-gradient(135deg, rgba(59,130,246,0.95), rgba(79,70,229,0.95))",
             border: "none",
             borderRadius: 12,
             cursor: isIssuingLoan || !walletAddress ? "not-allowed" : "pointer",
@@ -633,16 +808,22 @@ const LoansScreen: React.FC = () => {
           }}
           onMouseOver={(e) => {
             if (!isIssuingLoan && walletAddress) {
-              e.currentTarget.style.background = "linear-gradient(135deg, rgba(37,99,235,0.95), rgba(67,56,202,0.95))";
+              e.currentTarget.style.background =
+                "linear-gradient(135deg, rgba(37,99,235,0.95), rgba(67,56,202,0.95))";
             }
           }}
           onMouseOut={(e) => {
             if (!isIssuingLoan && walletAddress) {
-              e.currentTarget.style.background = "linear-gradient(135deg, rgba(59,130,246,0.95), rgba(79,70,229,0.95))";
+              e.currentTarget.style.background =
+                "linear-gradient(135deg, rgba(59,130,246,0.95), rgba(79,70,229,0.95))";
             }
           }}
         >
-          {isIssuingLoan ? "Processing Loan..." : !walletAddress ? "Connect Wallet First" : "Review My Advance"}
+          {isIssuingLoan
+            ? "Processing Loan..."
+            : !walletAddress
+            ? "Connect Wallet First"
+            : "Review My Advance"}
         </button>
       </div>
 
@@ -676,7 +857,9 @@ const LoansScreen: React.FC = () => {
           }}
         >
           <div style={{ fontSize: 16, color: "#9ca3af", marginBottom: 8 }}>
-            {walletAddress ? "No loans found" : "Connect your wallet to view loans"}
+            {walletAddress
+              ? "No loans found"
+              : "Connect your wallet to view loans"}
           </div>
           {walletAddress && (
             <div style={{ fontSize: 14, color: "#6b7280" }}>
@@ -714,7 +897,9 @@ const LoansScreen: React.FC = () => {
                 <td style={tdStyle}>
                   <div>{loan.name}</div>
                   {loan.principal && (
-                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                    <div
+                      style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}
+                    >
                       Principal: ${loan.principal.toFixed(2)}
                     </div>
                   )}
@@ -722,8 +907,11 @@ const LoansScreen: React.FC = () => {
                 <td style={tdStyle}>
                   <div>{loan.amount} USDC</div>
                   {loan.total_owed && loan.amount_repaid !== undefined && (
-                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                      Repaid: ${loan.amount_repaid.toFixed(2)} / ${loan.total_owed.toFixed(2)}
+                    <div
+                      style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}
+                    >
+                      Repaid: ${loan.amount_repaid.toFixed(2)} / $
+                      {loan.total_owed.toFixed(2)}
                     </div>
                   )}
                 </td>
@@ -734,7 +922,10 @@ const LoansScreen: React.FC = () => {
                       borderRadius: 6,
                       fontSize: 12,
                       fontWeight: 600,
-                      backgroundColor: loan.status === "Active" ? "rgba(34, 197, 94, 0.2)" : "rgba(156, 163, 175, 0.2)",
+                      backgroundColor:
+                        loan.status === "Active"
+                          ? "rgba(34, 197, 94, 0.2)"
+                          : "rgba(156, 163, 175, 0.2)",
                       color: loan.status === "Active" ? "#22c55e" : "#9ca3af",
                     }}
                   >
@@ -830,14 +1021,18 @@ const LoansScreen: React.FC = () => {
 
             <div style={{ marginBottom: 24 }}>
               <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 16 }}>
-                <strong>Loan ID:</strong> <span style={{ color: "#0f172a" }}>{selectedLoan?.id}</span>
+                <strong>Loan ID:</strong>{" "}
+                <span style={{ color: "#0f172a" }}>{selectedLoan?.id}</span>
               </p>
               <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 16 }}>
-                <strong>Loan Name:</strong> <span style={{ color: "#0f172a" }}>{selectedLoan?.name}</span>
+                <strong>Loan Name:</strong>{" "}
+                <span style={{ color: "#0f172a" }}>{selectedLoan?.name}</span>
               </p>
               <p style={{ fontSize: 14, color: "#6b7280", marginBottom: 16 }}>
                 <strong>Outstanding Amount:</strong>{" "}
-                <span style={{ color: "#0f172a", fontWeight: "bold" }}>{selectedLoan?.amount} USDC</span>
+                <span style={{ color: "#0f172a", fontWeight: "bold" }}>
+                  {selectedLoan?.amount} USDC
+                </span>
               </p>
 
               <label
